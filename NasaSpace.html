@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación de Datos / Data Simulation</title>
+
+    <!-- Importar la biblioteca Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Importar Leaflet.js para el mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <!-- Estilos -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #myChart {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            margin-top: 50px;
+        }
+        .lang-toggle {
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="title">Simulación de Datos / Data Simulation</h1>
+    <p id="description">Gráfico de datos simulados y mapa con puntos aleatorios / Simulated data graph and map with random points</p>
+
+    <!-- Filtros de selección -->
+    <label for="provinceSelect">Provincia:</label>
+    <select id="provinceSelect" onchange="updateCantons()">
+        <option value="">Seleccione una provincia</option>
+    </select>
+
+    <label for="cantonSelect">Cantón:</label>
+    <select id="cantonSelect" onchange="updateCities()">
+        <option value="">Seleccione un cantón</option>
+    </select>
+
+    <label for="citySelect">Ciudad:</label>
+    <select id="citySelect" onchange="filterData()">
+        <option value="">Seleccione una ciudad</option>
+    </select>
+    
+    <canvas id="myChart" width="400" height="400"></canvas>
+    <div id="map"></div>
+
+    <div>
+        <button class="lang-toggle" onclick="setLanguage('es')">Español</button>
+        <button class="lang-toggle" onclick="setLanguage('en')">English</button>
+    </div>
+
+    <script>
+        const provincesData = {
+            "San José": {
+                cantons: {
+                    "San José": ["San José", "Escazú", "Desamparados"],
+                    "Alajuelita": ["Alajuelita", "Concepción", "San Antonio"]
+                },
+                data: {
+                    CO2: [10, 20, 30, 40],
+                    CH4: [5, 15, 25, 35]
+                }
+            },
+            "Alajuela": {
+                cantons: {
+                    "Alajuela": ["Alajuela", "San José", "San Antonio"],
+                    "San Ramón": ["San Ramón", "Piedades", "Los Ángeles"]
+                },
+                data: {
+                    CO2: [15, 25, 35, 45],
+                    CH4: [10, 20, 30, 40]
+                }
+            },
+            "Heredia": {
+                cantons: {
+                    "Heredia": ["Heredia", "San Rafael", "Barva"],
+                    "Santo Domingo": ["Santo Domingo", "Santa Rosa", "San Vicente"]
+                },
+                data: {
+                    CO2: [12, 22, 32, 42],
+                    CH4: [8, 18, 28, 38]
+                }
+            },
+            "Cartago": {
+                cantons: {
+                    "Cartago": ["Cartago", "El Guarco", "La Unión"],
+                    "Turrialba": ["Turrialba", "La Suiza", "Peralta"]
+                },
+                data: {
+                    CO2: [14, 24, 34, 44],
+                    CH4: [7, 17, 27, 37]
+                }
+            },
+            "Limón": {
+                cantons: {
+                    "Limón": ["Limón", "Guápiles", "Siquirres"],
+                    "Pococí": ["Pococí", "Limoncito", "Río Jiménez"]
+                },
+                data: {
+                    CO2: [13, 23, 33, 43],
+                    CH4: [9, 19, 29, 39]
+                }
+            },
+            "Puntarenas": {
+                cantons: {
+                    "Puntarenas": ["Puntarenas", "Pueblo Nuevo", "Barranca"],
+                    "Esparza": ["Esparza", "San Juan Grande", "San Rafael"]
+                },
+                data: {
+                    CO2: [11, 21, 31, 41],
+                    CH4: [6, 16, 26, 36]
+                }
+            },
+            "Guanacaste": {
+                cantons: {
+                    "Liberia": ["Liberia", "Cañas", "Bagaces"],
+                    "Nicoya": ["Nicoya", "Santa Cruz", "Tamarindo"]
+                },
+                data: {
+                    CO2: [16, 26, 36, 46],
+                    CH4: [11, 21, 31, 41]
+                }
+            }
+        };
+
+        const dataEs = {
+            labels: ['Enero', 'Febrero', 'Marzo', 'Abril'],
+            datasets: [{
+                label: 'Dato Simulado CO2',
+                data: [15, 22, 14, 18],
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: false
+            },
+            {
+                label: 'Dato Simulado CH4',
+                data: [10, 18, 12, 13],
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 2,
+                fill: false
+            }]
+        };
+
+        const dataEn = {
+            labels: ['January', 'February', 'March', 'April'],
+            datasets: [{
+                label: 'Simulated Data CO2',
+                data: [15, 22, 14, 18],
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: false
+            },
+            {
+                label: 'Simulated Data CH4',
+                data: [10, 18, 12, 13],
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 2,
+                fill: false
+            }]
+        };
+
+        let currentLang = 'es';
+        let myChart;
+
+        // Mapa interactivo usando Leaflet
+        let map;
+
+        function initializeMap() {
+            map = L.map('map').setView([9.748917, -83.753428], 7);  // Coordenadas de Costa Rica
+
+            // Capa de mapa base
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Añadir puntos aleatorios para simular ubicaciones en el mapa
+            addLocationMarkers();
+        }
+
+        function addLocationMarkers() {
+            const locations = [
+                { coords: [9.932, -84.08], name: "San José", data: provincesData["San José"].data },
+                { coords: [10.016, -84.211], name: "Alajuela", data: provincesData["Alajuela"].data },
+                { coords: [10.002, -84.111], name: "Heredia", data: provincesData["Heredia"].data },
+                { coords: [9.856, -83.912], name: "Cartago", data: provincesData["Cartago"].data },
+                { coords: [10.467, -84.647], name: "Guanacaste", data: provincesData["Guanacaste"].data },
+                { coords: [9.990, -83.038], name: "Limón", data: provincesData["Limón"].data },
+                { coords: [9.976, -84.836], name: "Puntarenas", data: provincesData["Puntarenas"].data }
+            ];
+
+            locations.forEach(location => {
+                const marker = L.marker(location.coords).addTo(map);
+                
+                // Mostrar datos de gases en el popup
+                const popupContent = `
+                    <b>${location.name}</b><br>
+                    CO2: ${location.data.CO2.join(', ')}<br>
+                    CH4: ${location.data.CH4.join(', ')}
+                `;
+
+                marker.bindPopup(popupContent);
+            });
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            const title = document.getElementById('title');
+            const description = document.getElementById('description');
+
+            if (lang === 'es') {
+                title.textContent = 'Simulación de Datos';
+                description.textContent = 'Gráfico de datos simulados y mapa con puntos aleatorios';
+                myChart.data = dataEs;
+            } else {
+                title.textContent = 'Data Simulation';
+                description.textContent = 'Simulated data graph and map with random points';
+                myChart.data = dataEn;
+            }
+
+            myChart.update();
+        }
+
+        function updateChart(newData) {
+            myChart.data = newData;
+            myChart.update();
+        }
+
+        function updateCantons() {
+            const province = document.getElementById('provinceSelect').value;
+            const cantonSelect = document.getElementById('cantonSelect');
+            cantonSelect.innerHTML = '<option value="">Seleccione un cantón</option>';
+
+            if (province && provincesData[province]) {
+                const cantons = Object.keys(provincesData[province].cantons);
+                cantons.forEach(canton => {
+                    const option = document.createElement('option');
+                    option.value = canton;
+                    option.textContent = canton;
+                    cantonSelect.appendChild(option);
+                });
+            }
+        }
+
+        function updateCities() {
+            const province = document.getElementById('provinceSelect').value;
+            const canton = document.getElementById('cantonSelect').value;
+            const citySelect = document.getElementById('citySelect');
+            citySelect.innerHTML = '<option value="">Seleccione una ciudad</option>';
+
+            if (province && canton && provincesData[province]) {
+                const cities = provincesData[province].cantons[canton];
+                cities.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city;
+                    option.textContent = city;
+                    citySelect.appendChild(option);
+                });
+            }
+        }
+
+        function filterData() {
+            const province = document.getElementById('provinceSelect').value;
+            const canton = document.getElementById('cantonSelect').value;
+            const city = document.getElementById('citySelect').value;
+
+            if (province && canton && city && provincesData[province]) {
+                const provinceData = provincesData[province].data;
+
+                const filteredData = {
+                    labels: currentLang === 'es' ? ['Enero', 'Febrero', 'Marzo', 'Abril'] : ['January', 'February', 'March', 'April'],
+                    datasets: [{
+                        label: currentLang === 'es' ? `CO2 en ${city}` : `CO2 in ${city}`,
+                        data: provinceData.CO2.map(value => value + Math.floor(Math.random() * 10)),  // Variación simulada
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    },
+                    {
+                        label: currentLang === 'es' ? `CH4 en ${city}` : `CH4 in ${city}`,
+                        data: provinceData.CH4.map(value => value + Math.floor(Math.random() * 10)),  // Variación simulada
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                };
+
+                updateChart(filteredData);
+            }
+        }
+
+        window.onload = function() {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: dataEs,
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            loadProvinces();
+            initializeMap();
+        };
+
+        function loadProvinces() {
+            const provinceSelect = document.getElementById('provinceSelect');
+            const provinces = Object.keys(provincesData);
+
+            provinces.forEach(province => {
+                const option = document.createElement('option');
+                option.value = province;
+                option.textContent = province;
+                provinceSelect.appendChild(option);
+            });
+        }
+    </script>
+</body>
+</html>
